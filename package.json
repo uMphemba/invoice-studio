@@ -1,0 +1,7 @@
+{
+  "name": "invoice-studio",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": { "start": "node server.js", "backup": "node backup.js", "test": "node --test" },
+  "engines": { "node": ">=24" }
+}
