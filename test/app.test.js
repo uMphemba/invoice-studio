@@ -19,6 +19,9 @@ test('account isolation, invoice math, numbering and payments',async()=>{
   try{
     const a=await call('/auth/register','POST',{email:'owner@example.com',password:'strong-password-123'});assert.equal(a.status,200);
     const owner=a.cookie;
+    for(let attempt=0;attempt<13;attempt++)assert.equal((await call('/auth/login','POST',{email:'owner@example.com',password:'strong-password-123'})).status,200);
+    for(let attempt=0;attempt<12;attempt++)assert.equal((await call('/auth/login','POST',{email:'owner@example.com',password:'wrong-password-123'})).status,401);
+    assert.equal((await call('/auth/login','POST',{email:'owner@example.com',password:'wrong-password-123'})).status,429);
     let r=await call('/businesses','POST',{name:'Studio A',currency:'ZAR',prefix:'INV-2026-',taxRegistered:true,defaultTaxRate:15},owner);assert.equal(r.status,201);const bid=r.body.id;
     const pngChunk=(tag,data)=>{const name=Buffer.from(tag),len=Buffer.alloc(4),crc=Buffer.alloc(4);len.writeUInt32BE(data.length);let value=0xffffffff;for(const byte of Buffer.concat([name,data])){value^=byte;for(let k=0;k<8;k++)value=(value>>>1)^(value&1?0xedb88320:0)}crc.writeUInt32BE((value^0xffffffff)>>>0);return Buffer.concat([len,name,data,crc])};
     const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(1,0);ihdr.writeUInt32BE(1,4);ihdr[8]=8;ihdr[9]=6;
@@ -58,8 +61,9 @@ test('long PDF repeats table headings and keeps totals on A4 pages',()=>{
   const items=Array.from({length:50},(_,i)=>({description:`Consulting session ${i+1} with a detailed service description`,quantity:1,unitPrice:'100.00',taxableCents:10000,taxCents:1500}));
   const data={businessSnapshot:{name:'Long Invoice Ltd',address:'Johannesburg',locale:'en-ZA',banking:'Example Bank'},design:{template:'corporate',accent:'#203a65',font:'Arial',margin:42,heading:'INVOICE',tableStyle:'striped'},customer:{name:'Customer'},issueDate:'2026-10-01',dueDate:'2026-10-30',items,subtotalCents:500000,lineDiscountCents:0,invoiceDiscountCents:0,taxCents:75000,shippingCents:0};
   const output=drawInvoice({number:'INV-50',currency:'ZAR',totalCents:575000,paidCents:0,balanceCents:575000,data}).toString('latin1');
+  const encoded=value=>'<'+Array.from(value,c=>c.codePointAt(0).toString(16).padStart(4,'0')).join('')+'> Tj';
   assert.match(output,/\/MediaBox \[0 0 595\.28 841\.89\]/);
   assert.ok((output.match(/\/Type \/Page \/Parent/g)||[]).length>=2);
-  assert.equal((output.match(/DESCRIPTION\) Tj/g)||[]).length,(output.match(/\/Type \/Page \/Parent/g)||[]).length);
-  assert.match(output,/Balance due/);
+  assert.equal(output.split(encoded('Description')).length-1,(output.match(/\/Type \/Page \/Parent/g)||[]).length);
+  assert.ok(output.includes(encoded('Balance due')));
 });
